@@ -111,17 +111,18 @@ async def auction(b_cmd, *args):
 
 @bot.event
 async def on_reaction_add(reaction, user):
-    # @TODO: Needs more work, removing bot added reactions
-    record = db.getAuctionRecord(discord.utils.get(bot.guilds).id, reaction.message.id)
-    if reaction == "🛑" and user == reaction.guild.get_member_named(record.auctioneer):
-        db.closeAuction(discord.utils.get(bot.guilds).id, record.auction_id)
-        await reaction.message.delete()
-    elif reaction == "🕰️":
-        local_time = datetime.now()
-        await user.send(local_time)
-        await reaction.remove(user)
-    else:
-        await reaction.remove(user)
+    # ignore bot reactions
+    if not reaction.message.author.bot:
+        record = db.getAuctionRecord(discord.utils.get(bot.guilds).id, reaction.message.id)
+        if reaction == "🛑" and user == reaction.guild.get_member_named(record.auctioneer):
+            db.closeAuction(discord.utils.get(bot.guilds).id, record.auction_id)
+            await reaction.message.delete()
+        elif reaction == "🕰️":
+            local_time = datetime.now()
+            await user.send(local_time)
+            await reaction.remove(user)
+        else:
+            await reaction.remove(user)
 
 
 if __name__ == "__main__":
