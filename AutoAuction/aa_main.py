@@ -19,8 +19,7 @@ from src.utils import InvalidCommand
 valid_cmds = ['create_auction', 'edit_auction', 'cancel_auction', 'bid', 'config', 'help']
 
 load_dotenv()
-# TOKEN = os.getenv('DISCORD_TOKEN')
-TOKEN = 'OTQ0NDAwMTgyMTY5MTgyMjM5.YhBDNQ._U1IG-jCHex0sjs9GNj3BMcnmH4'
+TOKEN = os.getenv('DISCORD_TOKEN')
 intents = discord.Intents.default()
 intents.members = True
 db = None
