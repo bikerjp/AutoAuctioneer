@@ -17,15 +17,23 @@ class ParseArgs(object):
     Utilty class to convert a tuple to the a dictionary
     '''
 
+
     @staticmethod
-    def tupleToDict(p_tup):
-        temp = ' ' + ' '.join(p_tup)
-        arg_dict = None
-        if '-' in temp and ':' in temp:
+    def tupleToDict(tup):
+        temp = '' + ' '.join(tup)
+        arg_dict = dict()
+        if '-' in temp and '=' in temp:
             for param in temp.split('-'):
                 param = param.strip()
                 if param:
-                    k, v = param.split(':')
+                    k, v = param.split('=')
                     arg_dict[k] = v.strip()
 
         return arg_dict
+
+
+    @staticmethod
+    def removeCommand(tup):
+        new_tup = tup[1:]
+
+        return (new_tup)

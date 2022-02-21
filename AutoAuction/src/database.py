@@ -17,11 +17,14 @@ class AHDatabase(object):
 
     __conn = mysql.connector.connection.MySQLConnection
 
+
     def __init__(self):
         '''
         Constructor
         '''
-        self.__conn = mysql.connector.connect(user = 'ah_bot', password = '', host = 'localhost', database = 'mysql')
+        # temporary username and password
+        self.__conn = mysql.connector.connect(user = 'user', password = 'some_pass_word', host = 'localhost', database = 'mysql')
+
 
     def addNewAuctionHouse(self, p_guild: guild):
         # create a new auction
@@ -29,6 +32,7 @@ class AHDatabase(object):
             p_guild
         else:
             raise InvalidCommand("database:addNewAuctionHouse - Not connected to the database")
+
 
     def addAuctionRecord(self, guild_id, auction_item: Item):
         if self.__conn.is_connected():
@@ -43,6 +47,7 @@ class AHDatabase(object):
         else:
             raise InvalidCommand("database:addAuctionRecord - Not connected to the database")
 
+
     def closeAuction(self, guild_id, auction_id, cancelled = False):
         if self.__conn.is_connected():
             guild_id
@@ -52,11 +57,13 @@ class AHDatabase(object):
         else:
             raise InvalidCommand("database:closeAuction - Not connected to the database")
 
+
     def closeConnection(self):
         if self.__conn.is_connected():
             self.__conn.close()
         else:
             raise InvalidCommand("database:closeConnection - Not connected to the database")
+
 
     def getAuctionRecord(self, guild_id, msg_id):
         #
@@ -71,6 +78,7 @@ class AHDatabase(object):
 
         return record
 
+
     def addBidRecord(self, guild_id, auction_id):
         record = None
         if self.__conn.is_connected():
@@ -80,6 +88,7 @@ class AHDatabase(object):
             auction_id
         else:
             raise InvalidCommand("database:addBidRecord - Not connected to the database")
+
 
     def getBidRecord(self, guild_id, auction_id):
         record = None
@@ -91,6 +100,7 @@ class AHDatabase(object):
         else:
             raise InvalidCommand("database:getBidRecord - Not connected to the database")
 
+
     def getNextAuctionID(self):
         next_id = -1
         if self.__conn.is_connected():
@@ -98,12 +108,14 @@ class AHDatabase(object):
         else:
             raise InvalidCommand("database:getNextAuctionId - Not connected to the database")
 
+
     def getNextBidID(self):
         next_id = -1
         if self.__conn.is_connected():
             return next_id
         else:
             raise InvalidCommand("database:getNextBidId - Not connected to the database")
+
 
     def addConfigFile(self, guild_id, ah_config):
         if self.__conn.is_connected():
@@ -113,6 +125,7 @@ class AHDatabase(object):
             # populate config object
         else:
             raise InvalidCommand("database:addConfigFile - Not connected to the database")
+
 
     def getConfigFile(self, guild_id) -> Configuration:
         if self.__conn.is_connected():

@@ -23,10 +23,12 @@ class Bid(object):
     auto_bid_amount = 0
     max_total_bids = 0
 
+
     def __init__(self):
         '''
         Default Constructor. Does nothing
         '''
+
 
     def validate(self, auction_item = Item):
         '''
@@ -52,9 +54,11 @@ class Bid(object):
         if msg:
             print(msg)
 
-    def addBid(self, *args, auction_item):
+
+    def addBid(self, args, auction_item):
         if self.validate(auction_item):
             args
+
 
     def autoUpdateBid(self, last_bid):
         if self.auto_rebid and self.max_total_bids > 0:

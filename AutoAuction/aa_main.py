@@ -4,6 +4,7 @@ Created on Feb 14, 2022
 @author: JP
 '''
 
+import asyncio
 import discord
 import os
 from datetime import datetime
@@ -15,6 +16,7 @@ from src.configuration import Configuration
 from src.help import Help
 from src.item import Item
 from src.utils import InvalidCommand
+from src.utils import ParseArgs
 
 valid_cmds = ['create_auction', 'edit_auction', 'cancel_auction', 'bid', 'config', 'help']
 
@@ -40,14 +42,21 @@ async def on_ready():
 
 
 @bot.command()
-async def parseCommand(b_cmd, *args):
+async def auction(b_cmd, *args):
+    del_cmd = True
     # check b_cmd against list of valid commands
     # if valid cmd, execute cmd
     try:
-        if 'create_auction' in args:
-            validateCmdChannel(b_cmd)
+        act_args = tuple()
+        if len(args) == 0:
+            raise InvalidCommand('No command arguments given.')
+        else:
+            act_args = ParseArgs.removeCommand(args)
+
+        if 'create_auction' == args[0]:
+            validateCmdChannel(b_cmd, 'create_auction')
             new_auction = Item()
-            new_auction.createAuction(b_cmd.author, args)
+            new_auction.createAuction(str(b_cmd.author), act_args)
             db.addAuctionRecord(discord.utils.get(bot.guilds).id, new_auction)
             msg = await b_cmd.send(new_auction.createPost(b_cmd.guild))
             # reaction to close auction by seller
@@ -55,49 +64,54 @@ async def parseCommand(b_cmd, *args):
             # reaction to get auction end time converted to local tz, open to all
             await msg.add_reaction("🕰️")
 
-        elif 'edit_auction' in args:
-            validateCmdChannel(b_cmd)
+        elif 'edit_auction' == args[0]:
+            validateCmdChannel(b_cmd, 'edit_auction')
             # retrieve auction from database
             record = db.getAuctionRecord(discord.utils.get(bot.guilds).id, b_cmd.message.id)
             if record:
                 ah_post = b_cmd.channel.fetch_message(record.message_id)
-                record.updateAuction(args, ah_post)
+                record.updateAuction(act_args, ah_post)
                 db.addAuctionRecord(discord.utils.get(bot.guilds).id, record)
                 await ah_post.edit(content = new_auction.createPost(b_cmd.guild))
 
-        elif 'cancel_auction' in args:
-            validateCmdChannel(b_cmd)
-            db.cancelAuction(args)
+        elif 'cancel_auction' == args[0]:
+            validateCmdChannel(b_cmd, 'cancel_auction')
+            db.cancelAuction(act_args)
 
-        elif 'bid' in args:
-            validateCmdChannel(b_cmd)
+        elif 'bid' == args[0]:
+            validateCmdChannel(b_cmd, 'bid')
+            del_cmd = False
             bid = Bid()
-            bid.addNewBid(b_cmd, *args, db.getNextBidID())
+            bid.addBid(b_cmd, act_args, db.getNextBidID())
 
-        elif 'config' in args:
+        elif 'config' == args[0]:
             config = db.getConfigFile(discord.utils.get(bot.guilds).id)
-            config.setConfig(b_cmd.guild, args)
+            config.setConfig(b_cmd.guild, act_args)
 
-        elif 'help' in args:
+        elif 'help' == args[0]:
             # send a DM with bot commands
             p_help = Help()
             await b_cmd.author.send(p_help.printHelp(args))
 
         else:
-            raise InvalidCommand('Invalid command: '.join(args))
+            err = ' '
+            if len(args) > 0:
+                err = err.join(args)
+            raise InvalidCommand('Invalid command: ' + err)
     except InvalidCommand as ic:
         await b_cmd.author.send(ic)
         # if not valid cmd, send message to user with list of valid commands
-    except:
-        print ('Caught an unexcepted exception. log and move on.')
+    except Exception as err:
+        print ('Caught an unexcepted exception. log and move on. ' + str(err))
 
     # delete the message to reduce channel clutter, except for bidding on auctions
-    if 'bid' not in args:
+    if del_cmd:
         await b_cmd.message.delete()
 
 
 @bot.event
 async def on_reaction_add(reaction, user):
+    # @TODO: Needs more work, removing bot added reactions
     record = db.getAuctionRecord(discord.utils.get(bot.guilds).id, reaction.message.id)
     if reaction == "🛑" and user == reaction.guild.get_member_named(record.auctioneer):
         db.closeAuction(discord.utils.get(bot.guilds).id, record.auction_id)
@@ -110,9 +124,7 @@ async def on_reaction_add(reaction, user):
         await reaction.remove(user)
 
 
-if __name__ == "main":
+if __name__ == "__main__":
     db = AHDatabase()
 
-    print ('before bot run')
     bot.run(TOKEN)
-    print ('after bot run')
