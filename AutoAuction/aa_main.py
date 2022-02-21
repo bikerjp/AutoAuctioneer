@@ -57,8 +57,9 @@ async def auction(b_cmd, *args):
             validateCmdChannel(b_cmd, 'create_auction')
             new_auction = Item()
             new_auction.createAuction(str(b_cmd.author), act_args)
-            db.addAuctionRecord(discord.utils.get(bot.guilds).id, new_auction)
             msg = await b_cmd.send(new_auction.createPost(b_cmd.guild))
+            new_auction.message_id = msg.id
+            db.addAuctionRecord(discord.utils.get(bot.guilds).id, new_auction)
             # reaction to close auction by seller
             await msg.add_reaction("🛑")
             # reaction to get auction end time converted to local tz, open to all
