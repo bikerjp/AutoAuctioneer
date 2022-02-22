@@ -18,37 +18,43 @@ class Configuration(object):
         '''
         Contains the paired channel name and unique channel identifier
         '''
-
         # The name of the chat channel
         chan_name = ''
         # The unique channel id1
         chan_id = -1
 
 
-        def __init__(self, chan_name = '', chan_id = -1):
-            self.chan_name = chan_name
-            self.chan_id = chan_id
-
-
-        def __str__(self):
-            return 'chan_name: ' + self.chan_name + ', chan_id: ' + self.chan_id
+        def __init__(self, in_dict = {}):
+            if len(in_dict) > 0:
+                for k, v in in_dict.items():
+                    setattr(self, k, v)
+            else:
+                self.chan_name = ''
+                self.chan_id = -1
 
 
     channels = {}
 
 
-    def __init__(self):
+    def __init__(self, in_dict = {'':{}}):
         '''
         Constructor - Set the default channel names and ids
         '''
-        self.channels['auction_channel'] = self.AuctionChannel('auction-house')
-        self.channels['bid_channel'] = self.AuctionChannel('auction-bid')
-        self.channels['chat_channel'] = self.AuctionChannel('auction-chat')
-        self.channels['trade_channel'] = self.AuctionChannel('auction-trade_board')
+        if len(in_dict) > 0 and '' not in in_dict.keys():
+            for k, v in in_dict.items():
+                self.channels[k] = self.AuctionChannel(v)
+        else:
+            self.channels['auction_channel'] = self.AuctionChannel({'chan_name':'auction-house', 'chan_id':-1})
+            self.channels['bid_channel'] = self.AuctionChannel({'chan_name':'auction-bid', 'chan_id':-1})
+            self.channels['chat_channel'] = self.AuctionChannel({'chan_name':'auction-chat', 'chan_id':-1})
+            self.channels['trade_channel'] = self.AuctionChannel({'chan_name':'auction-trade_board', 'chan_id':-1})
 
 
-    def __str__(self):
-        return str(self.channels)
+    def toDict(self):
+        ret_dict = {}
+        for key in self.channels.keys():
+            ret_dict[key] = vars(self.channels[key])
+        return ret_dict
 
 
     def setConfigs(self, guild, chan_args: {}):

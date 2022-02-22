@@ -4,7 +4,6 @@ Created on Feb 14, 2022
 @author: JP
 '''
 
-import asyncio
 import discord
 import os
 from datetime import datetime
@@ -18,7 +17,7 @@ from src.item import Item
 from src.utils import InvalidCommand
 from src.utils import ParseArgs
 
-valid_cmds = ['create_auction', 'edit_auction', 'cancel_auction', 'bid', 'config', 'help']
+valid_cmds = ['create_auction', 'edit_auction', 'bid', 'config', 'help']
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -29,7 +28,7 @@ bot = commands.Bot(command_prefix = '!', intents = intents)
 
 
 def validateCmdChannel(b_cmd, action):
-    config = db.getConfigFile(discord.utils.get(bot.guilds).id)
+    config = Configuration(db.getConfigFile(discord.utils.get(bot.guilds).id))
     act_chan = config.getActionChannel(action)
     if b_cmd.message.channel.name != act_chan:
         raise InvalidCommand('Incorrect channel for action. ' + action + ' command is restricted to the channel: ' + act_chan)
@@ -59,7 +58,7 @@ async def auction(b_cmd, *args):
             new_auction.createAuction(str(b_cmd.author), act_args)
             msg = await b_cmd.send(new_auction.createPost(b_cmd.guild))
             new_auction.message_id = msg.id
-            db.addAuctionRecord(discord.utils.get(bot.guilds).id, new_auction)
+            db.addAuctionRecord(discord.utils.get(bot.guilds).id, vars(new_auction))
             # reaction to close auction by seller
             await msg.add_reaction("🛑")
             # reaction to get auction end time converted to local tz, open to all
@@ -68,22 +67,14 @@ async def auction(b_cmd, *args):
         elif 'edit_auction' == args[0]:
             validateCmdChannel(b_cmd, 'edit_auction')
             # retrieve auction from database
-            record = db.getAuctionRecord(discord.utils.get(bot.guilds).id, b_cmd.message.id)
-            if record:
-                ah_post = b_cmd.channel.fetch_message(record.message_id)
-                record.updateAuction(act_args, ah_post)
-                db.addAuctionRecord(discord.utils.get(bot.guilds).id, record)
-                await ah_post.edit(content = new_auction.createPost(b_cmd.guild))
-
-        elif 'cancel_auction' == args[0]:
-            validateCmdChannel(b_cmd, 'cancel_auction')
-            db.cancelAuction(act_args)
+            ah_post, post_content = Item.editAuction(discord.utils.get(bot.guilds).id, b_cmd.channel, args)
+            await ah_post.edit(content = post_content)
 
         elif 'bid' == args[0]:
             validateCmdChannel(b_cmd, 'bid')
+            ah_post, post_content = Bid.addBid(b_cmd, args, discord.utils.get(bot.guilds).id)
+            await ah_post.edit(content = post_content)
             del_cmd = False
-            bid = Bid()
-            bid.addBid(b_cmd, act_args, db.getNextBidID())
 
         elif 'config' == args[0]:
             config = db.getConfigFile(discord.utils.get(bot.guilds).id)
@@ -99,6 +90,7 @@ async def auction(b_cmd, *args):
             if len(args) > 0:
                 err = err.join(args)
             raise InvalidCommand('Invalid command: ' + err)
+
     except InvalidCommand as ic:
         await b_cmd.author.send(ic)
         # if not valid cmd, send message to user with list of valid commands
@@ -113,14 +105,14 @@ async def auction(b_cmd, *args):
 @bot.event
 async def on_reaction_add(reaction, user):
     # ignore bot reactions
-    if not reaction.message.author.bot:
-        record = db.getAuctionRecord(discord.utils.get(bot.guilds).id, reaction.message.id)
-        if reaction == "🛑" and user == reaction.guild.get_member_named(record.auctioneer):
+    if not user.bot:
+        record = Item(db.getAuctionRecordFromMsgId(discord.utils.get(bot.guilds).id, reaction.message.id))
+        if str(reaction.emoji) == "🛑" and user == reaction.guild.get_member_named(record.auctioneer):
             db.closeAuction(discord.utils.get(bot.guilds).id, record.auction_id)
             await reaction.message.delete()
-        elif reaction == "🕰️":
-            local_time = datetime.now()
-            await user.send(local_time)
+        elif str(reaction.emoji) == "🕰️":
+            await user.send('Auction for: ' + record.item_name + ' by ' + record.auctioneer \
+                            +' is ending at ' + str(record.end_date.astimezone(tz = None)))
             await reaction.remove(user)
         else:
             await reaction.remove(user)

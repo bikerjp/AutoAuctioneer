@@ -4,7 +4,10 @@ Created on Feb 15, 2022
 @author: JP
 '''
 
+import re
+from src.database import AHDatabase
 from src.item import Item
+from src.utils import ParseArgs, InvalidCommand
 
 
 class Bid(object):
@@ -12,11 +15,9 @@ class Bid(object):
     classdocs
     '''
 
-    __action_list = {'Bid', 'End'}
-
     auction_id = 0
-    bidder_id = 0
-    action = "Bid"
+    bidder_name = ""
+    bid_id = 0
     bid_value = 0
     notify = True
     auto_rebid = False
@@ -24,10 +25,22 @@ class Bid(object):
     max_total_bids = 0
 
 
-    def __init__(self):
+    def __init__(self, in_dict = {}):
         '''
         Default Constructor. Does nothing
         '''
+        if len(in_dict) > 0:
+            for k, v in in_dict.items():
+                setattr(self, k, v)
+        else:
+            self.auction_id = 0
+            self.bidder_name = ""
+            self.bid_id = 0
+            self.bid_value = 0
+            self.notify = True
+            self.auto_rebid = False
+            self.auto_bid_amount = 0
+            self.max_total_bids = 0
 
 
     def validate(self, auction_item = Item):
@@ -55,9 +68,31 @@ class Bid(object):
             print(msg)
 
 
-    def addBid(self, args, auction_item):
-        if self.validate(auction_item):
-            args
+    @staticmethod
+    def addBid(b_cmd, args, guild_id):
+        db = AHDatabase()
+        act_args = ParseArgs.tupleToDict(args)
+        try:
+            auction_id = act_args['auction_id']
+        except:
+            raise InvalidCommand('The auction_id argument is missing from command')
+        auction_record = db.getAuctionRecord(guild_id, auction_id)
+        if auction_record.auction_id == -1:
+            raise InvalidCommand('The requested auction does not exist. Auction_id: ' + auction_id)
+
+        ah_post = b_cmd.channel.fetch_message(auction_record.message_id)
+        bid = Bid(db.getBidRecord(guild_id, auction_record, str(b_cmd.author)))
+        if bid.bid_id == -1:
+            bid = Bid(act_args)
+            bid.bid_id = db.getNextBidID()
+            bid.bidder_name = str(b_cmd.author)
+
+        bid_upd = ah_post.content
+        bid_upd = re.sub(r'(.*Current bid: ).+(\n.*)', r'\1' + b_cmd.author.mention + ' ' + str(bid.bid_value) + r'gp\2', bid_upd)
+
+        if bid.validate(auction_record):
+            db.addBidRecord(guild_id, vars(bid))
+            return ah_post, bid_upd
 
 
     def autoUpdateBid(self, last_bid):
