@@ -85,8 +85,10 @@ async def auction(b_cmd, *args):
             ah_channel = discord.utils.get(guild.channels, name = conf.channels['auction_channel'].chan_name)
             ah_post = await ah_channel.fetch_message(auction_record.message_id)
             post_content, bid_post = Bid.addBid(b_cmd, cmd_args, guild.id, auction_record, ah_post.content)
-            await ah_post.edit(content = post_content)
-            await b_cmd.send(bid_post)
+            # do not update posts or send messages if bidder is leaving the auction
+            if bid_post != '':
+                await ah_post.edit(content = post_content)
+                await b_cmd.send(bid_post)
 
         elif 'config' == args[0]:
             config = db.getConfigFile(discord.utils.get(bot.guilds).id)
@@ -96,7 +98,7 @@ async def auction(b_cmd, *args):
         elif 'help' == args[0]:
             # send a DM with bot commands
             p_help = Help()
-            await b_cmd.author.send(p_help.printHelp(args))
+            await b_cmd.author.send(p_help.printHelp(act_args))
 
         else:
             err = ' '

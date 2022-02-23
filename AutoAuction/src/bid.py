@@ -24,7 +24,7 @@ class Bid(object):
     notify = True
     auto_rebid = False
     auto_bid_amount = 0
-    max_total_bids = 0
+    max_total_bid = 0
 
 
     def __init__(self, in_dict = {}):
@@ -42,7 +42,7 @@ class Bid(object):
             self.notify = True
             self.auto_rebid = False
             self.auto_bid_amount = 0
-            self.max_total_bids = 0
+            self.max_total_bid = 0
 
 
     def validate(self, first, auction_item, curr_bid):
@@ -62,19 +62,20 @@ class Bid(object):
             if self.bid_value > curr_bid + (2 * auction_item.getMinBid()):
                 msg += "\n - Invalid bid value, above maximum bid increment: " + str(curr_bid + (2 * auction_item.getMinBid()))
 
-        if self.auto_rebid == True:
+        if self.auto_rebid:
             if self.auto_bid_amount < auction_item.min_bid_inc:
                 msg += "\n - Invalid auto re-bid value (" + str(self.auto_bid_amount) + "), below minimum bid increment: "\
                     +str(auction_item.min_bid_inc)
             if self.auto_bid_amount > auction_item.getMinBid():
                 msg += "\n - Invalid auto re-bid value (" + str(self.auto_bid_amount) + "), above maximum bid increment: "\
                     +str(2 * auction_item.getMinBid())
-            if self.max_total_bids < 1:
-                msg += "\n - Invalid maximum total number of automatic rebids, must be 1 or greater"
+            if self.max_total_bid < auction_item.getMinBid():
+                msg += "\n - Invalid maximum automatic rebid value(" + str(self.max_total_bid) + "), must be greater than the "\
+                    +"minimum bid of " + str(auction_item.getMinBid())
 
-        if msg:
-            msg = "Auction item: " + auction_item.item_name + " - Bid issues:" + msg
-            raise InvalidCommand(msg)
+            if msg:
+                msg = "Auction item: " + auction_item.item_name + " - Bid issues:" + msg
+                raise InvalidCommand(msg)
 
         return True
 
@@ -91,11 +92,18 @@ class Bid(object):
         if bid.bid_id == 0:
             bid.bid_id = db.getNextBidID()
             bid.bidder_name = str(b_cmd.author)
+            bid.notify = True
+            bid.auto_rebid = False
             first = True
         else:
             bid_match = re.search(r'.*Current bid:.*\> ([0-9.]*)gp\n.*', ah_post)
             if bid_match is not None:
                 curr_bid = int(bid_match.group(1))
+
+        # check to see if bidder is leaving an auction
+        if bid.bid_value == 0 and str(b_cmd.author) == bid.bidder_name:
+            # call method to process exiting the auction
+            return ah_post, ''
 
         if 'auto_bid_amount' in args:
             bid.auto_bid_amount = int(args['auto_bid_amount'])
@@ -104,8 +112,8 @@ class Bid(object):
                 bid.auto_rebid = distutils.util.strtobool(args['auto_rebid'])
             except ValueError as err:
                 raise InvalidCommand('Invalid argument for auto_rebid: ' + err + '. Must be a true/false or yes/no, case insensitive.')
-        if 'max_total_bids' in args:
-            bid.max_total_bids = int(args['max_total_bids'])
+        if 'max_total_bid' in args:
+            bid.max_total_bids = int(args['max_total_bid'])
         if 'notify' in args:
             try:
                 bid.notify = distutils.util.strtobool(args['notify'])
