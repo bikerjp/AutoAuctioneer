@@ -4,10 +4,12 @@ Created on Feb 15, 2022
 @author: JP
 '''
 
+import distutils.util
 import re
+from src.configuration import Configuration
 from src.database import AHDatabase
 from src.item import Item
-from src.utils import ParseArgs, InvalidCommand
+from src.utils import InvalidCommand
 
 
 class Bid(object):
@@ -43,56 +45,80 @@ class Bid(object):
             self.max_total_bids = 0
 
 
-    def validate(self, auction_item = Item):
+    def validate(self, first, auction_item, curr_bid):
         '''
         Validates the inputs for the new bid. If any of the bid parameters are incorrect,
         '''
         global __action_list
         msg = ""
 
-        if self.action not in self.__action_list:
-            msg = "Invalid Bid command entered: " + self.action
-        if self.bid_value < auction_item.getMinBid():
-            msg += "\nInvalid bid value, below bid minimum: " + str(auction_item.getMinBid())
-        if self.bid_value > 2 * auction_item.getMinBid():
-            msg += "\nInvalid bid value, above bid maximum: " + str(2 * auction_item.getMinBid())
+        if first:
+            if self.bid_value != int(auction_item.getMinBid()):
+                msg += "\n - Invalid bid value (" + str(self.bid_value) + ") does not equal initial bid: " + str(auction_item.getMinBid())
+        else:
+            if self.bid_value < curr_bid + auction_item.min_bid_inc:
+                msg += '\n - Invalid bid value. (' + str(self.bid_value) + ') must be greater than ' + \
+                                      str(curr_bid + auction_item.min_bid_inc)
+            if self.bid_value > curr_bid + (2 * auction_item.getMinBid()):
+                msg += "\n - Invalid bid value, above maximum bid increment: " + str(curr_bid + (2 * auction_item.getMinBid()))
+
         if self.auto_rebid == True:
-            if self.auto_bid_amount < auction_item.getMinBid():
-                msg += "\nInvalid auto re-bid value, below bid minimum: " + str(auction_item.getMinBid())
+            if self.auto_bid_amount < auction_item.min_bid_inc:
+                msg += "\n - Invalid auto re-bid value (" + str(self.auto_bid_amount) + "), below minimum bid increment: "\
+                    +str(auction_item.min_bid_inc)
             if self.auto_bid_amount > auction_item.getMinBid():
-                msg += "\nInvalid auto re-bid value, above bid maximum: " + str(2 * auction_item.getMinBid())
+                msg += "\n - Invalid auto re-bid value (" + str(self.auto_bid_amount) + "), above maximum bid increment: "\
+                    +str(2 * auction_item.getMinBid())
             if self.max_total_bids < 1:
-                msg += "\nInvalid maximum total number of automatic rebids, must be 1 or greater"
+                msg += "\n - Invalid maximum total number of automatic rebids, must be 1 or greater"
 
         if msg:
-            print(msg)
+            msg = "Auction item: " + auction_item.item_name + " - Bid issues:" + msg
+            raise InvalidCommand(msg)
+
+        return True
 
 
     @staticmethod
-    def addBid(b_cmd, args, guild_id):
+    def addBid(b_cmd, args, guild_id, auction_record, ah_post):
         db = AHDatabase()
-        act_args = ParseArgs.tupleToDict(args)
-        try:
-            auction_id = act_args['auction_id']
-        except:
-            raise InvalidCommand('The auction_id argument is missing from command')
-        auction_record = db.getAuctionRecord(guild_id, auction_id)
-        if auction_record.auction_id == -1:
-            raise InvalidCommand('The requested auction does not exist. Auction_id: ' + auction_id)
+        first = False
+        curr_bid = 0
 
-        ah_post = b_cmd.channel.fetch_message(auction_record.message_id)
-        bid = Bid(db.getBidRecord(guild_id, auction_record, str(b_cmd.author)))
-        if bid.bid_id == -1:
-            bid = Bid(act_args)
+        bid = Bid(db.getBidRecord(guild_id, auction_record.auction_id, str(b_cmd.author)))
+        bid.bid_value = int(args['bid_value'])
+
+        if bid.bid_id == 0:
             bid.bid_id = db.getNextBidID()
             bid.bidder_name = str(b_cmd.author)
+            first = True
+        else:
+            bid_match = re.search(r'.*Current bid:.*\> ([0-9.]*)gp\n.*', ah_post)
+            if bid_match is not None:
+                curr_bid = int(bid_match.group(1))
 
-        bid_upd = ah_post.content
-        bid_upd = re.sub(r'(.*Current bid: ).+(\n.*)', r'\1' + b_cmd.author.mention + ' ' + str(bid.bid_value) + r'gp\2', bid_upd)
+        if 'auto_bid_amount' in args:
+            bid.auto_bid_amount = int(args['auto_bid_amount'])
+        if 'auto_rebid' in args:
+            try:
+                bid.auto_rebid = distutils.util.strtobool(args['auto_rebid'])
+            except ValueError as err:
+                raise InvalidCommand('Invalid argument for auto_rebid: ' + err + '. Must be a true/false or yes/no, case insensitive.')
+        if 'max_total_bids' in args:
+            bid.max_total_bids = int(args['max_total_bids'])
+        if 'notify' in args:
+            try:
+                bid.notify = distutils.util.strtobool(args['notify'])
+            except ValueError as err:
+                raise InvalidCommand('Invalid argument for notify: ' + err + '. Must be a true/false or yes/no, case insensitive.')
 
-        if bid.validate(auction_record):
-            db.addBidRecord(guild_id, vars(bid))
-            return ah_post, bid_upd
+        bid_upd = re.sub(r'(.*Current bid:).*(\n.*)', r'\1' + b_cmd.author.mention + ' ' + str(bid.bid_value) + r'gp\2', ah_post)
+        bid_post = b_cmd.author.mention + ' is bidding ' + str(bid.bid_value) + 'gp on item ' + auction_record.item_name \
+            +' being sold by ' + auction_record.auctioneer
+
+        if bid.validate(first, auction_record, curr_bid):
+            db.addBidRecord(guild_id, auction_record.auction_id, vars(bid))
+            return bid_upd, bid_post
 
 
     def autoUpdateBid(self, last_bid):

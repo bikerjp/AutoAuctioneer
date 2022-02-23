@@ -21,7 +21,7 @@ class Item(object):
     __bid_mins = {'Common': 25, 'Uncommon': 100, 'Rare': 700, 'Very Rare': 7000, 'Legendary': 25000}
     auctioneer = ""
     message_id = 0
-    auction_id = -1
+    auction_id = 0
     item_name = ""
     item_desc = ""
     rarity = ""
@@ -41,11 +41,13 @@ class Item(object):
                 if k != 'end_date':
                     setattr(self, k, v)
                 else:
-                    self.end_date = datetime.fromisoformat(v)
+                    # for local database testing no transform needed
+                    self.end_date = v
+#                    self.end_date = datetime.fromisoformat(v)
         else:
             self.auctioneer = ""
             self.message_id = 0
-            self.auction_id = -1
+            self.auction_id = 0
             self.item_name = ""
             self.item_desc = ""
             self.rarity = ""
@@ -74,29 +76,35 @@ class Item(object):
 
 
     def createAuction(self, author, args):
+        db = AHDatabase()
         if not self.auctioneer:
             self.auctioneer = author
         if len(args) == 1:
             raise InvalidCommand('No arguments provided.')
         arg_dict = ParseArgs.tupleToDict(args)
-        self.item_name = arg_dict['item_name']
-        if 'item_desc' in arg_dict.keys():
-            self.item_desc = arg_dict['item_desc']
-        self.rarity = arg_dict['rarity']
         try:
-            self.consumable = distutils.util.strtobool(arg_dict['consumable'])
-        except ValueError as err:
-            raise InvalidCommand('Invalid argument for consumable: ' + err + '. Must be a true/false or yes/no, case insensitive.')
-        if 'quantity' in arg_dict.keys():
-            self.quantity = int(arg_dict['quantity'])
-        try:
-            self.end_date = datetime.strptime(arg_dict['end_date'], '%Y/%m/%d %H:%M').replace(tzinfo = None).astimezone(tz = timezone.utc)
+            self.item_name = arg_dict['item_name']
+            if 'item_desc' in arg_dict.keys():
+                self.item_desc = arg_dict['item_desc']
+            self.rarity = arg_dict['rarity']
+            try:
+                self.consumable = distutils.util.strtobool(arg_dict['consumable'])
+            except ValueError as err:
+                raise InvalidCommand('Invalid argument for consumable: ' + err + '. Must be a true/false or yes/no, case insensitive.')
+            if 'quantity' in arg_dict.keys():
+                self.quantity = int(arg_dict['quantity'])
+            try:
+                self.end_date = datetime.strptime(arg_dict['end_date'], '%Y/%m/%d %H:%M').replace(tzinfo = None).astimezone(tz = timezone.utc)
+            except Exception as err:
+                raise InvalidCommand('Invalid date time entered:' + str(err))
+            if 'min_bid_inc' in arg_dict.keys():
+                self.min_bid_inc = int(arg_dict['min_bid_inc'])
         except Exception as err:
-            raise InvalidCommand('Invalid date time entered:' + str(err))
-        if 'min_bid_inc' in arg_dict.keys():
-            self.min_bid_inc = int(arg_dict['min_bid_inc'])
+            raise InvalidCommand('Unable to create auction due to error: ' + err)
 
         self.validArgs()
+
+        self.auction_id = db.getNextAuctionID()
 
 
     def extendTime(self, post_content) -> str:
@@ -156,8 +164,6 @@ class Item(object):
                 , post_content)
 
         record.validArgs()
-
-        record.auction_id = db.getNextAuctionID()
 
         return ah_post, post_content
 

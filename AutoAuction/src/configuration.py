@@ -47,7 +47,7 @@ class Configuration(object):
             self.channels['auction_channel'] = self.AuctionChannel({'chan_name':'auction-house', 'chan_id':-1})
             self.channels['bid_channel'] = self.AuctionChannel({'chan_name':'auction-bid', 'chan_id':-1})
             self.channels['chat_channel'] = self.AuctionChannel({'chan_name':'auction-chat', 'chan_id':-1})
-            self.channels['trade_channel'] = self.AuctionChannel({'chan_name':'auction-trade_board', 'chan_id':-1})
+            self.channels['trade_channel'] = self.AuctionChannel({'chan_name':'auction-trade-board', 'chan_id':-1})
 
 
     def toDict(self):

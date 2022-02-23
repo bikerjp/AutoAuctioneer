@@ -3,10 +3,22 @@ Created on Feb 15, 2022
 
 @author: JP
 '''
+
+import copy
 import mysql.connector
 from discord import guild
 from src.utils import InvalidCommand
 from src.singleton import Singleton
+
+
+class Auctions():
+    fields = {}
+    bids = {}
+
+
+    def __init__(self):
+        self.fields = {}
+        self.bids = {}
 
 
 class AHDatabase(metaclass = Singleton):
@@ -17,10 +29,27 @@ class AHDatabase(metaclass = Singleton):
     __conn = None
 
 
+    class Guilds():
+        auctions = {}
+        config = {}
+
+
+        def __init__(self):
+            self.auctions = {}
+            self.config = {}
+
+
+    __guilds = {}
+
+    __next_auction_id = 1
+    __next_bid_id = 1
+
+
     def __init__(self, *args, **kwargs):
         '''
         Constructor
         '''
+
         # temporary username and password
         if self.__conn is None:
             self.__conn = mysql.connector.connect(user = 'user', password = 'some_pass_word', host = 'localhost', database = 'mysql')
@@ -29,7 +58,8 @@ class AHDatabase(metaclass = Singleton):
     def addNewAuctionHouse(self, p_guild: guild):
         # create a new auction
         if self.isConnected():
-            p_guild
+            guild = self.Guilds()
+            self.__guilds[p_guild.id] = guild
         else:
             raise InvalidCommand("database:addNewAuctionHouse - Not connected to the database")
 
@@ -43,22 +73,25 @@ class AHDatabase(metaclass = Singleton):
 
     def addAuctionRecord(self, guild_id, auction_item):
         if self.isConnected():
-            auction_item
-            guild_id
-        # if auction_item not in database
-            # create new database record
-            # get next available auction id
-            # populate database record with auction_item
-        # else
-            # report error and return
+            auction = Auctions()
+            auction_id = auction_item['auction_id']
+            # check to see if the auction id already exists to keep all recorded bids
+            if auction_id in self.__guilds[guild_id].auctions:
+                auction = self.__guilds[guild_id].auctions[auction_id]
+            auction.fields = auction_item
+            self.__guilds[guild_id].auctions[auction_id] = auction
         else:
             raise InvalidCommand("database:addAuctionRecord - Not connected to the database")
 
 
     def closeAuction(self, guild_id, auction_id):
         if self.isConnected():
-            guild_id
-            auction_id
+            try:
+                self.__guilds[guild_id].auctions.pop(auction_id)
+                cancelled = False
+            except:
+                raise InvalidCommand('Auction id (' + str(auction_id) + ') could not be found')
+            return cancelled
         else:
             raise InvalidCommand("database:closeAuction - Not connected to the database")
 
@@ -72,70 +105,54 @@ class AHDatabase(metaclass = Singleton):
 
     def getAuctionRecord(self, guild_id, auction_id):
         #
-        record = {}
         if self.isConnected():
-            # get auction record by auction id
-            record
-            guild_id
-            auction_id
+            if auction_id in self.__guilds[guild_id].auctions:
+                return self.__guilds[guild_id].auctions[auction_id].fields
+            else:
+                # no auction record found, return an empty dictionary
+                return {}
         else:
             raise InvalidCommand("database:getAuctionRecord - Not connected to the database")
 
-        return record
 
-
-    def getAuctionRecordFromMsgId(self, guild_id, msg_id):
-        #
-        record = {}
+    def addBidRecord(self, guild_id, auction_id, bid):
         if self.isConnected():
-            # get auction record by auction id
-            record
-            guild_id
-            msg_id
-        else:
-            raise InvalidCommand("database:getAuctionRecord - Not connected to the database")
-
-        return record
-
-
-    def addBidRecord(self, guild_id, bid):
-        record = {}
-        if self.isConnected():
-            # get auction record by auction id
-            record
-            guild_id
-            bid
+            # check to see if the auction id already exists to keep all recorded bids
+            if auction_id in self.__guilds[guild_id].auctions:
+                # get auction record by auction id
+                auction = self.__guilds[guild_id].auctions[auction_id]
+                auction.bids[bid['bidder_name']] = bid
+                self.__guilds[guild_id].auctions[auction_id] = auction
+            else:
+                raise InvalidCommand('Unable to add bid for auction id(' + str(auction_id) + ') - auction does not exist')
         else:
             raise InvalidCommand("database:addBidRecord - Not connected to the database")
 
 
-    def getBidRecord(self, guild_id, auction_id, bidder):
+    def getBidRecord(self, guild_id, auction_id, bidder_name):
         if self.isConnected():
-            # get auction record by auction id
-            record = None
-            guild_id
-            bidder
-            auction_id
-            # get all bids from the guild auction house for the specific auction id
-            # loop through all bid records
-                # if bidder name matches a bid record, retrieve bid record
-
-            return record
+            try:
+                return self.__guilds[guild_id].auctions[auction_id].bids[bidder_name]
+            except:
+                # No bid record found for bidder, return empty dictionary
+                return {}
         else:
             raise InvalidCommand("database:getBidRecord - Not connected to the database")
 
 
     def getNextAuctionID(self):
-        next_id = -1
         if self.isConnected():
+            next_id = self.__next_auction_id
+            self.__next_auction_id += 1
             return next_id
         else:
             raise InvalidCommand("database:getNextAuctionId - Not connected to the database")
 
 
     def getNextBidID(self):
-        next_id = -1
         if self.isConnected():
+            next_id = self.__next_bid_id
+            self.__next_bid_id += 1
             return next_id
         else:
             raise InvalidCommand("database:getNextBidId - Not connected to the database")
@@ -143,8 +160,7 @@ class AHDatabase(metaclass = Singleton):
 
     def addConfigFile(self, guild_id, ah_config):
         if self.isConnected():
-            guild_id
-            ah_config
+            self.__guilds[guild_id].config = copy.deepcopy(ah_config)
             # get configuration table from datase for the guild
             # populate config object
         else:
@@ -153,10 +169,10 @@ class AHDatabase(metaclass = Singleton):
 
     def getConfigFile(self, guild_id):
         if self.isConnected():
-            guild_id
-            config = {'':{}}
-            # get configuration table from datase for the guild
-            # populate config object
-            return config
+            try:
+                return self.__guilds[guild_id].config
+            except:
+                # no config record found, return an empty dictionary
+                return {'':{}}
         else:
             raise InvalidCommand("database:getConfigFile - Not connected to the database")
