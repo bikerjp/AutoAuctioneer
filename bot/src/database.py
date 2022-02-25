@@ -5,7 +5,7 @@ Created on Feb 15, 2022
 '''
 
 import copy
-import mysql.connector
+# import mysql.connector
 from discord import guild
 from src.utils import InvalidCommand
 from src.singleton import Singleton
@@ -52,7 +52,8 @@ class AHDatabase(metaclass = Singleton):
 
         # temporary username and password
         if self.__conn is None:
-            self.__conn = mysql.connector.connect(user = 'user', password = 'some_pass_word', host = 'localhost', database = 'mysql')
+#            self.__conn = mysql.connector.connect(user = 'user', password = 'some_pass_word', host = 'localhost', database = 'mysql')
+            self.__conn = True
 
 
     def addNewAuctionHouse(self, p_guild: guild):
@@ -65,7 +66,7 @@ class AHDatabase(metaclass = Singleton):
 
 
     def isConnected(self):
-        if self.__conn is not None and self.__conn.is_connected():
+        if self.__conn is not None:  # and self.__conn.is_connected():
             return True
         else:
             return False
