@@ -25,6 +25,7 @@ class Bid(object):
     auto_rebid = False
     auto_bid_amount = 0
     max_total_bid = 0
+    cancel = False
 
 
     def __init__(self, in_dict = {}):
@@ -43,6 +44,7 @@ class Bid(object):
             self.auto_rebid = False
             self.auto_bid_amount = 0
             self.max_total_bid = 0
+            self.cancel = False
 
 
     def validate(self, first, auction_item, curr_bid):
@@ -53,7 +55,7 @@ class Bid(object):
         msg = ""
 
         if first:
-            if self.bid_value != int(auction_item.getMinBid()):
+            if self.bid_value != auction_item.getMinBid():
                 msg += "\n - Invalid bid value (" + str(self.bid_value) + ") does not equal initial bid: " + str(auction_item.getMinBid())
         else:
             if self.bid_value < curr_bid + auction_item.min_bid_inc:
@@ -87,7 +89,10 @@ class Bid(object):
         curr_bid = 0
 
         bid = Bid(db.getBidRecord(guild_id, auction_record.auction_id, str(b_cmd.author)))
-        bid.bid_value = int(args['bid_value'])
+        try:
+            bid.bid_value = float(args['bid_value'])
+        except:
+            raise InvalidCommand('Entered bid_value: ' + str(args['bid_value']) + ' is not a number.')
 
         if bid.bid_id == 0:
             bid.bid_id = db.getNextBidID()
@@ -96,14 +101,16 @@ class Bid(object):
             bid.auto_rebid = False
             first = True
         else:
-            bid_match = re.search(r'.*Current bid:.*\> ([0-9.]*)gp\n.*', ah_post)
+            bid_match = re.search(r'.*Current bid:(.*\>) ([0-9.]*)gp\n.*', ah_post)
             if bid_match is not None:
-                curr_bid = int(bid_match.group(1))
+                curr_bidder = bid_match.group(1)
+                curr_bid = int(bid_match.group(2))
 
-        # check to see if bidder is leaving an auction
-        if bid.bid_value == 0 and str(b_cmd.author) == bid.bidder_name:
-            # call method to process exiting the auction
-            return ah_post, ''
+            if curr_bidder == bid.bidder_name:
+                if bid.cancel:
+                    return ah_post, '', bid.bidder_name, True
+                else:
+                   raise InvalidCommand('Already highest bidder')
 
         if 'auto_bid_amount' in args:
             bid.auto_bid_amount = int(args['auto_bid_amount'])
@@ -126,13 +133,14 @@ class Bid(object):
 
         if bid.validate(first, auction_record, curr_bid):
             db.addBidRecord(guild_id, auction_record.auction_id, vars(bid))
-            return bid_upd, bid_post
+            return bid_upd, bid_post, bid.bidder_name, False
 
 
-    def autoUpdateBid(self, last_bid):
-        if self.auto_rebid and self.max_total_bids > 0:
-            self.bid_value = last_bid + self.auto_bid_amount
-            self.max_total_bids -= 1
-            return True
-        else:
-            return False
+    @staticmethod
+    def autoUpdateBid(guild_id, auction_record, ah_post, last_bidder):
+        db = AHDatabase()
+
+        # returns a dictionary of all valid bis for the auction, indexed by
+        bidders = db.getAuctionBidList(guild_id, auction_record.auction_id)
+
+        return bid_upd, bid_post, bid.bidder_name

@@ -67,7 +67,7 @@ class Item(object):
             raise InvalidCommand('Invalid quantity given: ' + str(self.quantity) + '. Must be a positive number 1 or greater')
         if self.min_bid_inc < 1 or self.min_bid_inc > (self.__bid_mins[self.rarity] / 2):
             raise InvalidCommand('Invalid argument for min_bid: ' + str(self.min_bid_inc) + \
-                                 '. Must be a positive number 1 or greater and less-than or equal to half item value. Enterd: '\
+                                 '. Must be a positive number 1 or greater and less-than or equal to half min item value. Enterd: '\
                                  +str(self.min_bid_inc))
 
 
@@ -111,61 +111,53 @@ class Item(object):
         if not self.time_extended:
             self.time_extended = True
             self.end_date = self.end_date + timedelta(hours = 12)
-            post_content = re.sub(r'(.*Ending date and time \(UTC\)): [0-9:\-\+ ]+(\n.*)', r'\1 - Extended to: ' + str(self.end_date) + r'\2', post_content)
+            hex_date = hex(int(self.end_date.timestamp() // 60)).split('x')[1]
+            post_content = re.sub(r'(.*Ending date and time: https://a.chronus.eu)[0-9a-f]+(\n.*)', \
+                                  r'Extended time, new \1/' + hex_date + r'\2', post_content)
         return post_content
 
 
-    @staticmethod
-    def editAuction(guild_id, msg_channel, args) -> str:
-        db = AHDatabase()
-        arg_dict = ParseArgs.tupleToDict(args)
-
-        try:
-            auction_id = arg_dict['auction_id']
-        except:
-            raise InvalidCommand('Missing required parameter: -auction_id=<value>')
-
-        record = Item(db.getAuctionRecord(guild_id, auction_id))
-
-        ah_post = msg_channel.fetch_message(record.message_id)
-        post_content = ah_post.content
-
+    def editAuction(self, guild_id, arg_dict, post_content) -> str:
         if 'item_name' in arg_dict.keys():
-            record.item_name = arg_dict['item_name']
-            post_content = re.sub(r'(.*Auctioning: ).+(\n.*)', r'\1' + record.item_name + r'\2', post_content)
+            self.item_name = arg_dict['item_name']
+            post_content = re.sub(r'(.*Auctioning: ).+(\n.*)', r'\1' + self.item_name + r'\2', post_content)
         if 'item_desc' in arg_dict.keys():
-            record.item_desc = arg_dict['item_desc']
-            post_content = re.sub(r'(.*Description: ).*(\n\n.*)', r'\1' + record.item_desc + r'\2', post_content)
+            self.item_desc = arg_dict['item_desc']
+            post_content = re.sub(r'(.*Description: ).*(\n\n.*)', r'\1' + self.item_desc + r'\2', post_content)
         if 'rarity' in arg_dict.keys():
-            record.rarity = arg_dict['rarity']
+            self.rarity = arg_dict['rarity']
             post_content = re.sub(r'(.*Starting bid: ).+(\n.*)', r'\1' \
-                +str(record.__bid_mins[record.rarity] if not record.consumable else record.__bid_mins[record.rarity] / 2) + 'gp\n' \
+                +str(self.__bid_mins[self.rarity] if not self.consumable else self.__bid_mins[self.rarity] / 2) + 'gp\n' \
                 +r'\2', post_content)
         if 'consumable' in arg_dict.keys():
             try:
-                record.consumable = distutils.util.strtobool(arg_dict['consumable'])
+                self.consumable = distutils.util.strtobool(arg_dict['consumable'])
             except ValueError as err:
                 raise InvalidCommand('Invalid argument for consumable: ' + err + '. Must be a true/false or yes/no, case insensitive.')
             post_content = re.sub(r'(.*Starting bid: ).+(\n.*)', r'\1' \
-                +str(record.__bid_mins[record.rarity] if not record.consumable else record.__bid_mins[record.rarity] / 2) + r'gp\2', post_content)
+                +str(self.__bid_mins[self.rarity] if not self.consumable else self.__bid_mins[self.rarity] / 2) + r'gp\2', post_content)
         if 'quantity' in arg_dict.keys():
-            record.quantity = int(arg_dict['quantity'])
-            post_content = re.sub(r'(.*Quantity: ).+(\n.*)', r'\1' + record.item_desc + r'\2', post_content)
+            self.quantity = int(arg_dict['quantity'])
+            post_content = re.sub(r'(.*Quantity: ).+(\n.*)', r'\1' + self.item_desc + r'\2', post_content)
         if 'end_date' in arg_dict.keys():
             try:
-                record.end_date = datetime.strptime(arg_dict['end_date'], '%Y/%m/%d %H:%M').replace(tzinfo = None).astimezone(tz = timezone.utc)
-                post_content = re.sub(r'(.*Ending date and time \(UTC\): )[0-9:\-\+ ]+(\n.*)', r'\1' + str(record.end_date) + r'\2', post_content)
+                self.end_date = datetime.strptime(arg_dict['end_date'], '%Y/%m/%d %H:%M').replace(tzinfo = None).astimezone(tz = timezone.utc)
+                hex_date = hex(int(self.end_date.timestamp() // 60)).split('x')[1]
+                post_content = re.sub(r'(.*Ending date and time: https://a.chronus.eu)/[0-9a-f]+(\n.*)', r'\1/' + hex_date + r'\2', post_content)
             except Exception as err:
                 raise InvalidCommand('Invalid argument for end date and time. Enter in isoformat "YYYY/MM/DD HH:MM". Entered time: ' + str(err))
         if 'min_bid_inc' in arg_dict.keys():
-            record.min_bid_inc = int(arg_dict['min_bid_inc'])
-            post_content = re.sub(r'(.*Bid increments: ).*(\n.*)', r'\1' + str(record.min_bid_inc) + 'gp - ' \
-                +str(record.__bid_mins[record.rarity] * 2 if not record.consumable else record.__bid_mins[record.rarity]) + 'gp\2'\
+            self.min_bid_inc = int(arg_dict['min_bid_inc'])
+            post_content = re.sub(r'(.*Bid increments: ).*(\n.*)', r'\1' + str(self.min_bid_inc) + 'gp - ' \
+                +str(self.__bid_mins[self.rarity] * 2 if not self.consumable else self.__bid_mins[self.rarity]) + 'gp\2'\
                 , post_content)
 
-        record.validArgs()
+        self.validArgs()
 
-        return ah_post, post_content
+        db = AHDatabase()
+        db.addAuctionRecord(guild_id, vars(self))
+
+        return post_content
 
 
     def createPost(self, p_guild) -> str:
@@ -178,8 +170,7 @@ class Item(object):
             +"Current bid: \n"\
             +"Bid increments: " + str(self.min_bid_inc) + "gp - "\
                 +str(self.__bid_mins[self.rarity] * 2 if not self.consumable else self.__bid_mins[self.rarity]) + "gp\n\n"\
-            +"Ending date and time (UTC): " + str(self.end_date) + "\n\n"\
-            +"Click the 🕰 reaction️ to receive a message with Auction end date and time converted to your local time zone\n"\
+            +"Ending date and time: https://a.chronus.eu/" + hex(int(self.end_date.timestamp() // 60)).split('x')[1] + "\n\n"\
             +"Only the auction creator can react to the 🛑 reaction."
 
         return ah_str

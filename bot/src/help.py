@@ -74,13 +74,17 @@ class Help(object):
                 help_msg = 'Set the auction channel names for the server. The channels will need to be created prior to calling this command.'\
                         +' All parameters are optional. Command:\n'\
                     +'!auction config -auction_channel=name-of-channel -bid_channel=name-of-channel -chat_channel=name-of-channel'\
-                        +' -trade_channel=name-of-channel\n'\
+                        +' -trade_channel=name-of-channel -purge_auction=True/False -bidder_overwrite=True/False\n'\
                     +'Field details:\n'\
                     +'-auction_channel=name-of-channel: The name of the channel where sellers can enter commands to create/edit auctions and'\
                         +' where auctions will be posted by the bot.\n'\
                     +'-bid_channel=name-of-channel: The name of the channel where bidders can enter commands to bid on auctions and'\
                         +' where the bot will post the resolved bid command.\n'\
                     +'-chat_channel=name-of-channel: The name of the channel were auction related announcements are posted by the bot.\n'\
-                    +'-trade_channel=name-of-channel: The name of the channel were completed auctions are posted by the bot.\n'
+                    +'-trade_channel=name-of-channel: The name of the channel were completed auctions are posted by the bot.\n'\
+                    +'-purge_auction=[True/False,Yes/No]: Should the auction and all associated bids be deleted from the database when the'\
+                        +' auction is over? Field restricted to boolean terms. Defaults to False\n'\
+                    +'-bidder_overwrite=[True/False,Yes/No]: Should only the last bid be kept for each bidder? Field restricted to boolean terms.'\
+                        +' Defaults to False.\n'
 
         return help_msg

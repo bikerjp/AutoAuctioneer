@@ -49,7 +49,6 @@ class AHDatabase(metaclass = Singleton):
         '''
         Constructor
         '''
-
         # temporary username and password
         if self.__conn is None:
 #            self.__conn = mysql.connector.connect(user = 'user', password = 'some_pass_word', host = 'localhost', database = 'mysql')
