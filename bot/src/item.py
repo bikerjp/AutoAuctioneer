@@ -90,7 +90,7 @@ class Item(object):
             try:
                 self.consumable = distutils.util.strtobool(arg_dict['consumable'])
             except ValueError as err:
-                raise InvalidCommand('Invalid argument for consumable: ' + err + '. Must be a true/false or yes/no, case insensitive.')
+                raise InvalidCommand('Invalid argument for consumable: ' + str(err) + '. Must be a true/false or yes/no, case insensitive.')
             if 'quantity' in arg_dict.keys():
                 self.quantity = int(arg_dict['quantity'])
             try:
@@ -100,7 +100,7 @@ class Item(object):
             if 'min_bid_inc' in arg_dict.keys():
                 self.min_bid_inc = int(arg_dict['min_bid_inc'])
         except Exception as err:
-            raise InvalidCommand('Unable to create auction due to error: ' + err)
+            raise InvalidCommand('Unable to create auction due to error: ' + str(err))
 
         self.validArgs()
 
@@ -116,7 +116,7 @@ class Item(object):
 
 
     @staticmethod
-    def editAuction(guild_id, msg_channel, args) -> str:
+    async def editAuction(guild_id, msg_channel, args) -> str:
         db = AHDatabase()
         arg_dict = ParseArgs.tupleToDict(args)
 
@@ -135,7 +135,7 @@ class Item(object):
             post_content = re.sub(r'(.*Auctioning: ).+(\n.*)', r'\1' + record.item_name + r'\2', post_content)
         if 'item_desc' in arg_dict.keys():
             record.item_desc = arg_dict['item_desc']
-            post_content = re.sub(r'(.*Description: ).*(\n\n.*)', r'\1' + record.item_desc + r'\2', post_content)
+            post_content = re.sub(r'(.*Description: ).*(\n\n.*)', r'\1' + record.item_desc.replace('\\n', '\n') + r'\2', post_content)
         if 'rarity' in arg_dict.keys():
             record.rarity = arg_dict['rarity']
             post_content = re.sub(r'(.*Starting bid: ).+(\n.*)', r'\1' \
@@ -145,7 +145,7 @@ class Item(object):
             try:
                 record.consumable = distutils.util.strtobool(arg_dict['consumable'])
             except ValueError as err:
-                raise InvalidCommand('Invalid argument for consumable: ' + err + '. Must be a true/false or yes/no, case insensitive.')
+                raise InvalidCommand('Invalid argument for consumable: ' + str(err) + '. Must be a true/false or yes/no, case insensitive.')
             post_content = re.sub(r'(.*Starting bid: ).+(\n.*)', r'\1' \
                 +str(record.__bid_mins[record.rarity] if not record.consumable else record.__bid_mins[record.rarity] / 2) + r'gp\2', post_content)
         if 'quantity' in arg_dict.keys():
@@ -172,7 +172,7 @@ class Item(object):
         ah_str = "Seller: " + p_guild.get_member_named(self.auctioneer).mention + "\n"\
             +"Auction id: " + str(self.auction_id) + "\n"\
             +"Auctioning: " + self.item_name + "\n"\
-            +"Description: " + self.item_desc + "\n\n"\
+            +"Description: " + self.item_desc.replace('\\n', '\n') + "\n\n"\
             +"Quantity: " + str(self.quantity) + "\n\n"\
             +"Starting bid: " + str(self.__bid_mins[self.rarity] if not self.consumable else self.__bid_mins[self.rarity] / 2) + "gp\n"\
             +"Current bid: \n"\
