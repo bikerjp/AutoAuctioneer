@@ -116,7 +116,7 @@ class Item(object):
 
 
     @staticmethod
-    async def editAuction(guild_id, msg_channel, args) -> str:
+    def editAuction(guild_id, msg_channel, args) -> str:
         db = AHDatabase()
         arg_dict = ParseArgs.tupleToDict(args)
 
