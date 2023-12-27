@@ -23,9 +23,10 @@ class ParseArgs(object):
     @staticmethod
     def tupleToDict(tup):
         temp = '' + ' '.join(tup)
+        print(temp)
         arg_dict = dict()
         while temp:
-            str_match = re.match(r'-([a-z0-9_]+)=(.*?)[ ]*(-[a-z0-9_]+=.*$)', temp)
+            str_match = re.match(r'-([a-z0-9_]+)[ ]*=[ ]*(.*?)[ ]*(-[a-z0-9_]+[ ]*=.*$)', temp)
             if str_match is not None:
                 arg_dict[str_match.group(1)] = str_match.group(2)
                 # Check to see if there are any more parameters to be parsed
@@ -35,11 +36,12 @@ class ParseArgs(object):
                     temp = ''
             else:
                 # check to see if last parameter in string
-                str_match = re.match(r'-([a-z0-9_]+)=(.*)', temp)
+                str_match = re.match(r'-([a-z0-9_]+)[ ]*=[ ]*(.*)', temp)
                 if str_match is not None:
                     arg_dict[str_match.group(1)] = str_match.group(2)
                 temp = ''
 
+        print (arg_dict)
         return arg_dict
 
 

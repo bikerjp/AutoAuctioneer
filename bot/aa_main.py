@@ -6,12 +6,15 @@ Created on Feb 14, 2022
 
 import asyncio
 import concurrent.futures
-import discord
 import re
 import os
+import traceback
 from datetime import datetime
+
+import discord
 from dotenv import load_dotenv
 from discord.ext import commands
+
 from src.database import AHDatabase
 from src.bid import Bid
 from src.configuration import Configuration
@@ -28,9 +31,8 @@ intents = discord.Intents.default()
 intents.members = True
 intents.reactions = True
 db = None
-bot = commands.Bot(command_prefix = '!', intents = intents)
+bot = commands.Bot(command_prefix = '-', intents = intents)
 __locks = {}
-
 
 def validateCmdChannel(b_cmd, action):
     config = Configuration(db.getConfigFile(discord.utils.get(bot.guilds).id))
@@ -38,12 +40,10 @@ def validateCmdChannel(b_cmd, action):
     if b_cmd.message.channel.name != act_chan:
         raise InvalidCommand('Incorrect channel for action. ' + action + ' command is restricted to the channel: ' + act_chan)
 
-
 @bot.event
 async def on_ready():
     # register guild if not already in the database
     db.addNewAuctionHouse(discord.utils.get(bot.guilds))
-
 
 @bot.command()
 async def auction(b_cmd, *args):
@@ -76,24 +76,23 @@ async def auction(b_cmd, *args):
             except:
                 raise InvalidCommand('The auction_id argument is missing from command')
             guild = discord.utils.get(bot.guilds)
-            await __locks[guild.id][auction_record.auction_id].acquire()
+            await __locks[guild.id][auction_id].acquire()
             # retrieve auction from database
             auction_record = Item(db.getAuctionRecord(guild.id, auction_id))
             if auction_record.auction_id == 0:
                 __locks[guild.id][auction_record.auction_id].release()
                 raise InvalidCommand('The requested auction does not exist. Auction_id: ' + str(auction_id))
-            ah_post = await b_cmd.channel.fetch_message(auction_record.message_id)
             try:
-                post_content = ah_post.content
-            except AttributeError as err:
+                ah_post = await b_cmd.channel.fetch_message(auction_record.message_id)
+            except:
                 raise InvalidCommand(f'Message not found for message id {auction_record.message_id}')
             try:
-                post_content = auction_record.editAuction(discord.utils.get(bot.guilds).id, cmd_args, ah_post.content)
+                auction_record.editAuction(discord.utils.get(bot.guilds).id, cmd_args)
             except:
                 __locks[guild.id][auction_record.auction_id].release()
                 raise
             __locks[guild.id][auction_record.auction_id].release()
-            await ah_post.edit(content = post_content)
+            await ah_post.edit(content = auction_record.createPost(guild))
 
         elif 'bid' == args[0]:
             validateCmdChannel(b_cmd, 'bid')
@@ -103,22 +102,29 @@ async def auction(b_cmd, *args):
             except:
                 raise InvalidCommand('The auction_id argument is missing from command')
             guild = discord.utils.get(bot.guilds)
-            await __locks[guild.id][auction_record.auction_id].acquire()
+            await __locks[guild.id][auction_id].acquire()
             auction_record = Item(db.getAuctionRecord(guild.id, auction_id))
             if auction_record.auction_id == 0:
                 __locks[guild.id][auction_record.auction_id].release()
                 raise InvalidCommand('The requested auction does not exist. Auction_id: ' + str(auction_id))
+            elif guild.get_member_named(auction_record.auctioneer) == b_cmd.author:
+                __locks[guild.id][auction_record.auction_id].release()
+                raise InvalidCommand('You cannot bid on your own auction.')
+            print(f'auctioneer: {auction_record.auctioneer}, bidder: {b_cmd.author}')
             conf = Configuration(db.getConfigFile(guild.id))
             ah_channel = discord.utils.get(guild.channels, name = conf.channels['auction_channel'].chan_name)
             ah_post = await ah_channel.fetch_message(auction_record.message_id)
             try:
-                post_content, bid_post, last_bidder = Bid.addBid(b_cmd, cmd_args, guild.id, auction_record, ah_post.content)
+                post_content, bid_post, last_bidder, cancel = Bid.addBid(b_cmd, cmd_args, guild.id, auction_record, ah_post.content)
             except:
                 __locks[guild.id][auction_record.auction_id].release()
                 raise
             __locks[guild.id][auction_record.auction_id].release()
+            await ah_post.edit(content = post_content)
+            await b_cmd.send(bid_post)
 
             # do not update posts or send messages if bidder is leaving the auction
+            '''
             while bid_post != '':
                 await ah_post.edit(content = post_content)
                 await b_cmd.send(bid_post)
@@ -129,7 +135,7 @@ async def auction(b_cmd, *args):
                 __locks[guild.id][auction_record.auction_id].release()
                 # do not auto update again for another second. Allow other bidders to enter a bid.
                 await asyncio.sleep(1)
-
+            '''
         elif 'config' == args[0]:
             config = db.getConfigFile(discord.utils.get(bot.guilds).id)
             allowed = False
@@ -155,17 +161,16 @@ async def auction(b_cmd, *args):
                 err = err.join(args)
             raise InvalidCommand('Invalid command: ' + err)
 
-#    except InvalidCommand as ic:
-#        await b_cmd.author.send(ic)
-    except Error as err:
-        await b_cmd.author.send(err)
+    except InvalidCommand as ic:
+        await b_cmd.author.send(ic)
+    except:
+        traceback.print_exc()
         # if not valid cmd, send message to user with list of valid commands
 #    except Exception as err:
 #        print ('Caught an unexcepted exception. log and move on. ' + str(err))
 
     # delete the message to reduce channel clutter, except for bidding on auctions
     await b_cmd.message.delete()
-
 
 @bot.event
 async def on_reaction_add(reaction, user):
@@ -194,8 +199,10 @@ async def on_reaction_add(reaction, user):
             else:
                 await reaction.remove(user)
 
-
 if __name__ == "__main__":
     db = AHDatabase()
 
-    bot.run(TOKEN)
+    try:
+        bot.run(TOKEN)
+    except:
+        traceback.print_exc()

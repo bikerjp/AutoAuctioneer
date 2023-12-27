@@ -91,6 +91,8 @@ class Bid(object):
         bid = Bid(db.getBidRecord(guild_id, auction_record.auction_id, str(b_cmd.author)))
         try:
             bid.bid_value = float(args['bid_value'])
+        except KeyError as err:
+            raise InvalidCommand('Did not specify bid_value parameter and value. See !auction help bid for further details')
         except:
             raise InvalidCommand('Entered bid_value: ' + str(args['bid_value']) + ' is not a number.')
 
@@ -129,7 +131,7 @@ class Bid(object):
 
         bid_upd = re.sub(r'(.*Current bid:).*(\n.*)', r'\1' + b_cmd.author.mention + ' ' + str(bid.bid_value) + r'gp\2', ah_post)
         bid_post = b_cmd.author.mention + ' is bidding ' + str(bid.bid_value) + 'gp on item ' + auction_record.item_name \
-            +' being sold by ' + auction_record.auctioneer
+            + ' for auction id: ' + auction_record.auction_id
 
         if bid.validate(first, auction_record, curr_bid):
             db.addBidRecord(guild_id, auction_record.auction_id, vars(bid))
@@ -137,8 +139,10 @@ class Bid(object):
 
 
     @staticmethod
-    def autoUpdateBid(guild_id, auction_record, ah_post, last_bidder):
+    def autoUpdateBid(guild_id, auction_record, ah_post):
         db = AHDatabase()
+        bid_post = ''
+        bid_upd = ah_post
 
         # returns a dictionary of all valid bis for the auction, indexed by
         bidders = db.getAuctionBidList(guild_id, auction_record.auction_id)
